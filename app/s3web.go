@@ -1,12 +1,11 @@
 package app
 
 import (
+	"bytes"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
-	"os"
-	"strconv"
+	"path/filepath"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -32,9 +31,6 @@ func NewS3Web(opts S3webOptions) (*S3web, error) {
 
 //Run the web app
 func (s *S3web) Run() {
-	// expose the routes
-	// serve the web server
-	// log.Println("Running...")
 	http.HandleFunc("/", s.serveRoot)
 
 	log.Printf("Listening on port %s...\n", s.Port)
@@ -45,91 +41,64 @@ func (s *S3web) Run() {
 }
 
 func (s *S3web) serveRoot(w http.ResponseWriter, r *http.Request) {
-	//First of check if Get is set in the URL
-	Filename := r.URL.Query().Get("file")
-	if Filename == "" {
-		//Get not set, send a 400 bad request
-		http.Error(w, "Get 'file' not specified in url.", 400)
+	bucket := r.URL.Query().Get("bucket")
+	if bucket == "" {
+		http.Error(w, "Get 'bucket' not specified in url.", 400)
 		return
 	}
-	fmt.Println("Client requests: " + Filename)
 
-	err := getFromS3(&w, Filename)
-	if err != nil {
-		//File not found, send 404
-		http.Error(w, "File not found on S3.", 404)
+	object := r.URL.Query().Get("object")
+	if object == "" {
+		http.Error(w, "Get 'object' not specified in url.", 400)
 		return
 	}
-	err = getFromFile(&w, Filename)
+	filename := filepath.Base(object)
+
+	b, _, err := getFromS3(bucket, object)
 	if err != nil {
-		//File not found, send 404
-		http.Error(w, "File read error.", 404)
+		_logHTTPError(r, &w, err, 404)
 		return
+	} else {
+		_logRequest(r)
 	}
+
+	// Detect file header (first 512B) and write header
+	fileHeader := make([]byte, 512)
+	byteReader := bytes.NewReader(b)
+	byteReader.ReadAt(fileHeader, 0)
+	mime := http.DetectContentType(fileHeader)
+	found := true
+
+	if mime == "application/octet-stream" {
+		mime, found = fileGetMIME(filename)
+	}
+
+	if !found {
+		w.Header().Set("Content-Disposition", "attachment; filename="+filename)
+	}
+	w.Header().Set("Content-Type", mime)
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", cap(b)))
+
+	w.Write(b)
+
 	return
 }
 
-func getFromFile(w *http.ResponseWriter, filename string) error {
-	//Check if file exists and open
-	Openfile, err := os.Open(filename)
-	defer Openfile.Close() //Close after function return
-	if err != nil {
-		//File not found, send 404
-		http.Error(*w, "File not found.", 404)
-		return err
-	}
-
-	//File is found, create and send the correct headers
-
-	//Get the Content-Type of the file
-	//Create a buffer to store the header of the file in
-	FileHeader := make([]byte, 512)
-	//Copy the headers into the FileHeader buffer
-	Openfile.Read(FileHeader)
-	//Get content type of file
-	FileContentType := http.DetectContentType(FileHeader)
-
-	//Get the file size
-	FileStat, _ := Openfile.Stat()                     //Get info from file
-	FileSize := strconv.FormatInt(FileStat.Size(), 10) //Get file size as a string
-
-	//Send the headers
-	(*w).Header().Set("Content-Disposition", "attachment; filename="+filename)
-	(*w).Header().Set("Content-Type", FileContentType)
-	(*w).Header().Set("Content-Length", FileSize)
-
-	//Send the file
-	//We read 512 bytes from the file already, so we reset the offset back to 0
-	Openfile.Seek(0, 0)
-	io.Copy(*w, Openfile) //'Copy' the file to the client
-	return nil
-}
-
-func getFromS3(w *http.ResponseWriter, filename string) error {
-	// The session the S3 Downloader will use
+func getFromS3(bucket, object string) ([]byte, int64, error) {
 	sess := session.Must(session.NewSession(&aws.Config{
 		Region: aws.String("us-east-1"),
 	}))
 
-	// Create a downloader with the session and default options
 	downloader := s3manager.NewDownloader(sess)
+	buf := aws.NewWriteAtBuffer([]byte{})
 
-	// Create a file to write the S3 Object contents to.
-	f, err := os.Create(filename)
-	if err != nil {
-		return fmt.Errorf("failed to create file %q, %v", filename, err)
-	}
-
-	// buf := aws.NewWriteAtBuffer([]byte{})
-
-	// Write the contents of S3 Object to the file
-	n, err := downloader.Download(f, &s3.GetObjectInput{
-		Bucket: aws.String("linx-cloud-static"),
-		Key:    aws.String("index.md"),
+	n, err := downloader.Download(buf, &s3.GetObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(object),
 	})
 	if err != nil {
-		return fmt.Errorf("failed to download file, %v", err)
+		return nil, n, fmt.Errorf("failed to download file, %v", err)
 	}
-	fmt.Printf("file downloaded, %d bytes\n", n)
-	return nil
+
+	return buf.Bytes(), n, nil
 }
