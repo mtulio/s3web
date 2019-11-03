@@ -19,7 +19,7 @@ func init() {
 }
 
 func usage() {
-	fmt.Fprintf(os.Stderr, "usage: %s [--addr ':8000'] \n", os.Args[0])
+	fmt.Fprintf(os.Stderr, "usage: %s [--addr ':8080'] \n", os.Args[0])
 	flag.PrintDefaults()
 	os.Exit(2)
 }
