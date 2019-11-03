@@ -6,17 +6,14 @@ import (
 	"log"
 	"net/http"
 	"path/filepath"
-
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 )
 
+//S3web is the prototype for S3web application
 type S3web struct {
 	Port string
 }
 
+//S3webOptions is the options used for flag
 type S3webOptions struct {
 	Port *string
 }
@@ -41,6 +38,11 @@ func (s *S3web) Run() {
 }
 
 func (s *S3web) serveRoot(w http.ResponseWriter, r *http.Request) {
+	region := r.URL.Query().Get("region")
+	if region != "" {
+		defaultAWSRegion = region
+	}
+
 	bucket := r.URL.Query().Get("bucket")
 	if bucket == "" {
 		http.Error(w, "Get 'bucket' not specified in url.", 400)
@@ -82,23 +84,4 @@ func (s *S3web) serveRoot(w http.ResponseWriter, r *http.Request) {
 	w.Write(b)
 
 	return
-}
-
-func getFromS3(bucket, object string) ([]byte, int64, error) {
-	sess := session.Must(session.NewSession(&aws.Config{
-		Region: aws.String("us-east-1"),
-	}))
-
-	downloader := s3manager.NewDownloader(sess)
-	buf := aws.NewWriteAtBuffer([]byte{})
-
-	n, err := downloader.Download(buf, &s3.GetObjectInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(object),
-	})
-	if err != nil {
-		return nil, n, fmt.Errorf("failed to download file, %v", err)
-	}
-
-	return buf.Bytes(), n, nil
 }
