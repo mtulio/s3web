@@ -9,19 +9,46 @@ It's common used when you wouldn't like to provide AWS Credentials to access S3 
 ## Authentication
 
 The `s3web` can authenticate in S3 in three ways:
-- the host application access the S3 through IAM Roles (instance roles)
+
+- the host application access the S3 through IAM Roles (instance roles) or environment variables - default behaviog from SDK
 - provide AWS credentials on bootstrap (TODO)
 - send authentication through headers (TODO)
 - send authentication through query strings (TODO, needed?)
+
+## Build
+
+`make build`
+
+## Run
+
+### Local
+
+```bash
+$ ./bin/s3web-app
+2019/11/03 04:14:26 Listening on port :8080...
+```
+
+<!-- ### Docker (TODO)-->
+
+<!-- ### Kubernetes (TODO)-->
+
+<!-- ### Lambda (TODO)-->
 
 ## Usage
 
 ### Config
 
 You can specify the Bucket, Object and the Region (optional) in three ways:
+
 - URI
 - Query string
 - Headers
+
+### Get objects - Query string
+
+```bash
+curl 'localhost:8080/?bucket=myBucker&object=docs/index.html'
+```
 
 ### Get objects - URI
 
@@ -35,9 +62,7 @@ where:
 - `myBucker` is the bucket name
 - `My/path/of/object` is the object path (only supported objects - not paths)
 
-### Get objects - Query string (TODO)
-
-### Get objects - Headers (TODO)
+<!-- ### Get objects - Headers (TODO)-->
 
 ## Contribute
 
