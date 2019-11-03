@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	defaultAWSRegion = "us-esat-1"
+	defaultAWSRegion = "us-east-1"
 )
 
 func getFromS3(bucket, object string) ([]byte, int64, error) {
