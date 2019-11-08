@@ -6,22 +6,30 @@ import (
 	"log"
 	"net/http"
 	"path/filepath"
+	"strings"
 )
 
 //S3web is the prototype for S3web application
 type S3web struct {
-	Port string
+	Port       string
+	Host       string
+	ServeVhost bool
 }
 
 //S3webOptions is the options used for flag
 type S3webOptions struct {
 	Port *string
+	Host *string
 }
 
 //NewS3Web create a new web application
 func NewS3Web(opts S3webOptions) (*S3web, error) {
 	s := &S3web{
 		Port: *opts.Port,
+	}
+	if opts.Host != nil {
+		s.Host = *opts.Host
+		s.ServeVhost = true
 	}
 	return s, nil
 }
@@ -33,7 +41,7 @@ func (s *S3web) Run() {
 	log.Printf("Listening on port %s...\n", s.Port)
 	err := http.ListenAndServe(s.Port, nil)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 	}
 }
 
@@ -43,25 +51,24 @@ func (s *S3web) serveRoot(w http.ResponseWriter, r *http.Request) {
 		defaultAWSRegion = region
 	}
 
-	bucket := r.URL.Query().Get("bucket")
-	if bucket == "" {
-		http.Error(w, "Get 'bucket' not specified in url.", 400)
+	// bucket := r.URL.Query().Get("bucket")
+	// if bucket == "" {
+	// 	http.Error(w, "Get 'bucket' not specified in url.", 400)
+	// 	return
+	// }
+	bucket, object, ok := s.parseBucket(&w, r)
+	if !ok {
 		return
 	}
 
-	object := r.URL.Query().Get("object")
-	if object == "" {
-		http.Error(w, "Get 'object' not specified in url.", 400)
-		return
-	}
 	filename := filepath.Base(object)
 
 	b, _, err := getFromS3(bucket, object)
 	if err != nil {
-		_logHTTPError(r, &w, err, 404)
+		logHTTPError(r, &w, err, 404)
 		return
 	} else {
-		_logRequest(r)
+		logRequest(r)
 	}
 
 	// Detect file header (first 512B) and write header
@@ -84,4 +91,30 @@ func (s *S3web) serveRoot(w http.ResponseWriter, r *http.Request) {
 	w.Write(b)
 
 	return
+}
+
+func (s *S3web) parseBucket(w *http.ResponseWriter, r *http.Request) (
+	bucket string, object string, ok bool,
+) {
+	ok = true
+
+	if s.ServeVhost {
+		bucket = strings.Split(r.Host, ":")[0]
+		object = r.URL.Path
+
+	} else {
+		bucket = r.URL.Query().Get("bucket")
+		if bucket == "" {
+			http.Error(*w, "Get 'bucket' not specified in url.", 400)
+			return "", "", !ok
+		}
+
+		object = r.URL.Query().Get("object")
+		if object == "" {
+			http.Error(*w, "Get 'object' not specified in url.", 400)
+			return "", "", !ok
+		}
+	}
+
+	return bucket, object, ok
 }
