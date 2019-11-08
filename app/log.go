@@ -6,7 +6,7 @@ import (
 	"net/http"
 )
 
-func _logHTTPError(
+func logHTTPError(
 	r *http.Request,
 	w *http.ResponseWriter,
 	err error,
@@ -24,7 +24,7 @@ func _logHTTPError(
 	return
 }
 
-func _logRequest(
+func logRequest(
 	r *http.Request,
 ) {
 
