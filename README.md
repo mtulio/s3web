@@ -4,16 +4,16 @@ s3web can serve files from AWS S3 objects.
 
 It's common used when you wouldn't like to provide AWS Credentials to access S3 **and** the bucket is not exposed to the internet (Eg. internal web app to serve S3 data).
 
-**WARNING**: This web application is useful to retrieve S3 data on an secure network that the users should not have AWS Credentials, please, understand the risks to expose this application to the internet.
+**WARNING**: This web application is useful to retrieve S3 data on an secure network that the users should not have AWS Credentials, please, understand the risks to expose this application to the internet. One authentication on front of the API could be provided, but it is not covered here.
 
 ## Authentication
 
-The `s3web` can authenticate in S3 in three ways:
+The `s3web` can authenticate in S3 in three ways (proposal):
 
-- the host application access the S3 through IAM Roles (instance roles) or environment variables - default behaviog from SDK
+- the host application access the S3 through IAM Roles (instance roles) or environment variables - default behavior from SDK
 - provide AWS credentials on bootstrap (TODO)
 - send authentication through headers (TODO)
-- send authentication through query strings (TODO, needed?)
+- send authentication through query strings (TODO, unsafe/needed?)
 
 ## Build
 
